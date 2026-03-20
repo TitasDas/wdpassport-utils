@@ -1,6 +1,6 @@
 # wdpassport-utils
 
-Source: forked from https://github.com/TitasDas/wdpassport-utils (original work by KenMacD, funkypopcorn, Dan Lukes, and later contributors).
+Source: originally from https://github.com/KenMacD/wdpassport-utils (with contributions by funkypopcorn, Dan Lukes, and later maintainers).
 
 Purpose: unlock WD Security locked external drives on Linux and mount them after successful authentication.
 
