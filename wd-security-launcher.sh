@@ -8,13 +8,15 @@ SRC_PATH="$ROOT_DIR/wd-security.py"
 CMD=()
 if [[ -x "$BIN_PATH" ]]; then
   CMD=("$BIN_PATH")
-elif command -v python2 >/dev/null 2>&1; then
-  CMD=(python2 "$SRC_PATH")
-elif command -v python >/dev/null 2>&1; then
-  CMD=(python "$SRC_PATH")
+elif command -v python3 >/dev/null 2>&1; then
+  if ! python3 -c 'import PyQt5' >/dev/null 2>&1; then
+    echo "python3 found, but PyQt5 is missing. Install PyQt5 or build the binary with ./build-linux.sh."
+    exit 1
+  fi
+  CMD=(python3 "$SRC_PATH")
 else
   echo "No runnable app found."
-  echo "Build first with ./build-linux.sh or install python2."
+  echo "Build first with ./build-linux.sh or install python3 + PyQt5."
   exit 1
 fi
 

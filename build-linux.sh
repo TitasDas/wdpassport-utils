@@ -6,20 +6,13 @@ cd "$ROOT_DIR"
 
 if ! command -v pyinstaller >/dev/null 2>&1; then
   echo "pyinstaller is not installed."
-  echo "Install it first (example): pip install pyinstaller"
+  echo "Install it first (example): pip3 install pyinstaller"
   exit 1
 fi
 
-# This project is Python2/PyQt4 based.
-if command -v python2 >/dev/null 2>&1; then
-  PYTHON_BIN="${PYTHON_BIN:-python2}"
-else
-  PYTHON_BIN="${PYTHON_BIN:-python}"
-fi
-
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
-  echo "No suitable Python runtime found for build."
-  echo "Install python2 (recommended for this project), or set PYTHON_BIN explicitly."
+  echo "python3 not found. Install python3 or set PYTHON_BIN explicitly."
   exit 1
 fi
 

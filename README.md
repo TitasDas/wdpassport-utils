@@ -8,9 +8,10 @@ Source: originally from https://github.com/KenMacD/wdpassport-utils.
 - Launch it like a normal Linux app (desktop/app menu).
 
 ## Run it (Linux)
-1. `./build-linux.sh`
-2. `./install-desktop-entry.sh`
-3. Open **WD Security Unlocker** and unlock your drive.
+1. Install Python 3 + PyQt5.
+2. `./build-linux.sh`
+3. `./install-desktop-entry.sh`
+4. Open **WD Security Unlocker** and unlock your drive.
 
 ## Screenshots
 ![Home screen](assets/screenshot-home.png)
