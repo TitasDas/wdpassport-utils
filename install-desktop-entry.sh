@@ -23,4 +23,4 @@ chmod +x "$LAUNCHER"
 chmod +x "$DESKTOP_FILE"
 
 echo "Desktop entry installed: $DESKTOP_FILE"
-echo "You can now search for 'WD Security Unlocker' in your app launcher."
+echo "If it fails, check log: ~/.local/state/wd-security/launcher.log"

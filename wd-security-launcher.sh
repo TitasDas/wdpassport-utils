@@ -4,29 +4,55 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_PATH="$ROOT_DIR/dist/wd-security"
 SRC_PATH="$ROOT_DIR/wd-security.py"
+LOG_BASE="${XDG_STATE_HOME:-$HOME/.local/state}"
+LOG_DIR="$LOG_BASE/wd-security"
+LOG_FILE="$LOG_DIR/launcher.log"
+
+mkdir -p "$LOG_DIR"
+
+ts() { date '+%Y-%m-%d %H:%M:%S'; }
+
+notify_error() {
+  local msg="$1"
+  echo "[$(ts)] ERROR: $msg" >> "$LOG_FILE"
+  if command -v zenity >/dev/null 2>&1; then
+    zenity --error --title="WD Security Unlocker" --text="$msg" >/dev/null 2>&1 || true
+  fi
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send "WD Security Unlocker" "$msg" >/dev/null 2>&1 || true
+  fi
+  echo "$msg"
+}
 
 CMD=()
-if [[ -x "$BIN_PATH" ]]; then
-  CMD=("$BIN_PATH")
-elif command -v python3 >/dev/null 2>&1; then
-  if ! python3 -c 'import PyQt5' >/dev/null 2>&1; then
-    echo "python3 found, but PyQt5 is missing. Install PyQt5 or build the binary with ./build-linux.sh."
-    exit 1
-  fi
+
+# Prefer source run when Python3 + PyQt5 is available.
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import PyQt5' >/dev/null 2>&1; then
   CMD=(python3 "$SRC_PATH")
+elif [[ -x "$BIN_PATH" ]]; then
+  CMD=("$BIN_PATH")
 else
-  echo "No runnable app found."
-  echo "Build first with ./build-linux.sh or install python3 + PyQt5."
+  notify_error "No runnable app found. Install python3 + PyQt5 or run ./build-linux.sh first."
   exit 1
 fi
 
+echo "[$(ts)] Launch command: ${CMD[*]}" >> "$LOG_FILE"
+
 if command -v pkexec >/dev/null 2>&1; then
-  exec pkexec "${CMD[@]}"
+  if ! pkexec "${CMD[@]}" >> "$LOG_FILE" 2>&1; then
+    notify_error "Failed to launch via pkexec. See: $LOG_FILE"
+    exit 1
+  fi
+  exit 0
 fi
 
 if command -v sudo >/dev/null 2>&1; then
-  exec sudo "${CMD[@]}"
+  if ! sudo "${CMD[@]}" >> "$LOG_FILE" 2>&1; then
+    notify_error "Failed to launch via sudo. See: $LOG_FILE"
+    exit 1
+  fi
+  exit 0
 fi
 
-echo "Neither pkexec nor sudo is available. Cannot run with required root permissions."
+notify_error "Neither pkexec nor sudo is available. Cannot run with required root permissions."
 exit 1
