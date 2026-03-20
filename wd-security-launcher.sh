@@ -26,7 +26,6 @@ notify_error() {
 
 CMD=()
 
-# Prefer source run when Python3 + PyQt5 is available.
 if command -v python3 >/dev/null 2>&1 && python3 -c 'import PyQt5' >/dev/null 2>&1; then
   CMD=(python3 "$SRC_PATH")
 elif [[ -x "$BIN_PATH" ]]; then
@@ -39,19 +38,24 @@ fi
 echo "[$(ts)] Launch command: ${CMD[*]}" >> "$LOG_FILE"
 
 if command -v pkexec >/dev/null 2>&1; then
-  if ! pkexec "${CMD[@]}" >> "$LOG_FILE" 2>&1; then
-    notify_error "Failed to launch via pkexec. See: $LOG_FILE"
-    exit 1
+  if pkexec env \
+    DISPLAY="${DISPLAY:-}" \
+    XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" \
+    WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" \
+    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-}" \
+    QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}" \
+    "${CMD[@]}" >> "$LOG_FILE" 2>&1; then
+    exit 0
   fi
-  exit 0
+  echo "[$(ts)] pkexec launch failed, attempting sudo fallback" >> "$LOG_FILE"
 fi
 
 if command -v sudo >/dev/null 2>&1; then
-  if ! sudo "${CMD[@]}" >> "$LOG_FILE" 2>&1; then
-    notify_error "Failed to launch via sudo. See: $LOG_FILE"
-    exit 1
+  if sudo -E "${CMD[@]}" >> "$LOG_FILE" 2>&1; then
+    exit 0
   fi
-  exit 0
+  notify_error "Failed to launch via sudo. See: $LOG_FILE"
+  exit 1
 fi
 
 notify_error "Neither pkexec nor sudo is available. Cannot run with required root permissions."
