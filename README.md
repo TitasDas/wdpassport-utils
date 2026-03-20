@@ -5,7 +5,8 @@ Credits / source chain:
 - GUI rewrite contributor: https://github.com/electronicsguy
 - Original upstream: https://github.com/KenMacD/wdpassport-utils
 
-See [NOTICE](NOTICE) for full attribution and licensing context.
+See [NOTICE](NOTICE) for full attribution context.
+See [LICENSE](LICENSE) for rights on local modifications.
 
 ## What you can do
 - Unlock a password-protected WD Security drive.

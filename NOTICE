@@ -15,5 +15,6 @@ Important licensing note:
   sources.
 - No claim is made that upstream code is relicensed here.
 
-Local modifications in this repository include UI redesign, Python3/PyQt5 migration,
-launcher/packaging updates, security hardening, and documentation improvements.
+Rights statement for this repository:
+- The LICENSE file applies only to original modifications made by Titas Das in this repository.
+- Upstream/base code rights remain with original authors and are outside the scope of LICENSE.
