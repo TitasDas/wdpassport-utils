@@ -14,5 +14,8 @@ Source: originally from https://github.com/KenMacD/wdpassport-utils.
 4. Open **WD Security Unlocker** and unlock your drive.
 
 ## Screenshots
-![Home screen](assets/screenshot-home.png)
+### Main Screen
+![Main screen](assets/screenshot-home.png)
+
+### Unlock Success
 ![Unlock success](assets/screenshot-success.png)
