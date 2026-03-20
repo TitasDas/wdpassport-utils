@@ -11,16 +11,19 @@ import sys
 import tempfile
 
 from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QFontDatabase
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
     QFrame,
+    QGridLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
     QTextEdit,
+    QVBoxLayout,
 )
 
 PARTNAME = ''
@@ -44,94 +47,227 @@ def is_executable_available(binary):
 
 class WDSecurityWindow:
     def setup_ui(self, frame):
-        frame.setObjectName('Frame')
-        frame.resize(640, 520)
+        self.frame = frame
+        frame.setObjectName('rootFrame')
+        frame.resize(860, 620)
+        frame.setMinimumSize(760, 560)
         frame.setFrameShape(QFrame.StyledPanel)
         frame.setFrameShadow(QFrame.Raised)
         frame.setStyleSheet('''
-            QFrame { background-color: #f4f7fb; }
-            QLabel#titleLabel { color: #0f2a56; }
-            QLabel#headerLabel { color: #33507d; }
+            QFrame#rootFrame {
+                background-color: #edf2f8;
+            }
+            QFrame#headerCard {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 #17365f,
+                    stop: 1 #0f2745
+                );
+                border-radius: 14px;
+            }
+            QLabel#titleLabel {
+                color: #ffffff;
+                font-size: 28px;
+                font-weight: 700;
+            }
+            QLabel#subtitleLabel {
+                color: #d8e6fb;
+                font-size: 13px;
+            }
+            QLabel#chipLabel {
+                color: #0f2745;
+                background: #dbe8f9;
+                border-radius: 10px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: 600;
+            }
+            QFrame#panelCard {
+                background: #ffffff;
+                border: 1px solid #d6dfea;
+                border-radius: 12px;
+            }
+            QLabel#sectionTitle {
+                color: #12325c;
+                font-size: 15px;
+                font-weight: 700;
+            }
+            QLabel#fieldLabel {
+                color: #203957;
+                font-size: 12px;
+                font-weight: 600;
+            }
             QLineEdit {
-                border: 1px solid #9fb2ce;
-                border-radius: 6px;
-                padding: 6px;
+                border: 1px solid #aebfd7;
+                border-radius: 8px;
+                padding: 10px 12px;
+                font-size: 13px;
                 background: #ffffff;
             }
-            QTextEdit {
-                border: 1px solid #9fb2ce;
-                border-radius: 6px;
-                background: #ffffff;
+            QLineEdit:focus {
+                border: 1px solid #2d6fb4;
+            }
+            QCheckBox {
+                color: #274267;
+                font-size: 12px;
             }
             QPushButton {
-                background-color: #214e8a;
-                color: #ffffff;
                 border: 0;
-                border-radius: 6px;
-                padding: 8px 12px;
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 13px;
+                font-weight: 600;
+            }
+            QPushButton#primaryBtn {
+                background: #1d5fa9;
+                color: #ffffff;
+            }
+            QPushButton#secondaryBtn {
+                background: #3e6ea8;
+                color: #ffffff;
+            }
+            QPushButton#neutralBtn {
+                background: #eef3fb;
+                color: #21416a;
+                border: 1px solid #c8d5e8;
+            }
+            QPushButton#dangerBtn {
+                background: #d84f4f;
+                color: #ffffff;
             }
             QPushButton:disabled {
-                background-color: #9aa7ba;
+                background: #b8c3d2;
+                color: #eef2f8;
             }
-            QCheckBox { color: #1f3556; }
+            QTextEdit {
+                border: 1px solid #d0d9e6;
+                border-radius: 8px;
+                background: #fbfdff;
+                padding: 8px;
+                color: #1b2f4d;
+            }
         ''')
 
-        title_font = QFont('Waree', 18)
-        title_font.setBold(True)
+        main_layout = QVBoxLayout(frame)
+        main_layout.setContentsMargins(22, 22, 22, 22)
+        main_layout.setSpacing(14)
 
-        header_font = QFont('Times', 12)
-        header_font.setBold(True)
-        header_font.setItalic(True)
+        header_card = QFrame()
+        header_card.setObjectName('headerCard')
+        header_layout = QHBoxLayout(header_card)
+        header_layout.setContentsMargins(18, 16, 18, 16)
 
-        self.title_label = QLabel(frame)
-        self.title_label.setGeometry(50, 24, 540, 32)
-        self.title_label.setFont(title_font)
+        title_group = QVBoxLayout()
+        self.title_label = QLabel('WD Security Unlocker')
         self.title_label.setObjectName('titleLabel')
+        self.subtitle_label = QLabel('Unlock and mount compatible WD drives on Linux')
+        self.subtitle_label.setObjectName('subtitleLabel')
+        title_group.addWidget(self.title_label)
+        title_group.addWidget(self.subtitle_label)
 
-        self.header_label = QLabel(frame)
-        self.header_label.setGeometry(50, 58, 540, 28)
-        self.header_label.setFont(header_font)
-        self.header_label.setObjectName('headerLabel')
+        self.chip_label = QLabel('Root access required')
+        self.chip_label.setObjectName('chipLabel')
+        self.chip_label.setAlignment(Qt.AlignCenter)
+        self.chip_label.setMinimumWidth(170)
 
-        self.pw_label = QLabel(frame)
-        self.pw_label.setGeometry(52, 118, 85, 24)
+        header_layout.addLayout(title_group, 1)
+        header_layout.addWidget(self.chip_label, 0, Qt.AlignTop)
+        main_layout.addWidget(header_card)
 
-        self.pw_box = QLineEdit(frame)
-        self.pw_box.setGeometry(140, 114, 420, 34)
+        controls_card = QFrame()
+        controls_card.setObjectName('panelCard')
+        controls_layout = QVBoxLayout(controls_card)
+        controls_layout.setContentsMargins(16, 14, 16, 14)
+        controls_layout.setSpacing(12)
+
+        controls_title = QLabel('Drive Access')
+        controls_title.setObjectName('sectionTitle')
+        controls_layout.addWidget(controls_title)
+
+        form_layout = QGridLayout()
+        form_layout.setHorizontalSpacing(12)
+        form_layout.setVerticalSpacing(8)
+
+        self.pw_label = QLabel('Password')
+        self.pw_label.setObjectName('fieldLabel')
+
+        self.pw_box = QLineEdit()
         self.pw_box.setEchoMode(QLineEdit.Password)
         self.pw_box.setPlaceholderText('Enter password to unlock WD drive')
 
-        self.show_pw_check = QCheckBox(frame)
-        self.show_pw_check.setGeometry(140, 152, 180, 24)
+        self.show_pw_check = QCheckBox('Show password')
         self.show_pw_check.stateChanged.connect(self.toggle_password_visibility)
 
-        self.decrypt_btn = QPushButton(frame)
-        self.decrypt_btn.setGeometry(40, 192, 160, 50)
+        form_layout.addWidget(self.pw_label, 0, 0)
+        form_layout.addWidget(self.pw_box, 0, 1)
+        form_layout.addWidget(self.show_pw_check, 1, 1)
+        form_layout.setColumnStretch(1, 1)
+        controls_layout.addLayout(form_layout)
+
+        action_layout = QHBoxLayout()
+        action_layout.setSpacing(10)
+
+        self.decrypt_btn = QPushButton('Unlock Drive')
+        self.decrypt_btn.setObjectName('primaryBtn')
         self.decrypt_btn.clicked.connect(self.decrypt_wd)
 
-        self.mount_btn = QPushButton(frame)
+        self.mount_btn = QPushButton('Mount Drive')
+        self.mount_btn.setObjectName('secondaryBtn')
         self.mount_btn.setEnabled(False)
-        self.mount_btn.setGeometry(220, 192, 160, 50)
         self.mount_btn.clicked.connect(self.mount_wd)
 
-        self.exit_btn = QPushButton(frame)
-        self.exit_btn.setGeometry(400, 192, 160, 50)
+        self.exit_btn = QPushButton('Exit')
+        self.exit_btn.setObjectName('dangerBtn')
         self.exit_btn.clicked.connect(frame.close)
 
-        self.message_label = QLabel(frame)
-        self.message_label.setGeometry(40, 260, 180, 24)
+        for btn in (self.decrypt_btn, self.mount_btn, self.exit_btn):
+            btn.setMinimumHeight(42)
 
-        self.clear_log_btn = QPushButton(frame)
-        self.clear_log_btn.setGeometry(470, 258, 90, 28)
+        action_layout.addWidget(self.decrypt_btn)
+        action_layout.addWidget(self.mount_btn)
+        action_layout.addStretch(1)
+        action_layout.addWidget(self.exit_btn)
+        controls_layout.addLayout(action_layout)
+
+        main_layout.addWidget(controls_card)
+
+        status_card = QFrame()
+        status_card.setObjectName('panelCard')
+        status_layout = QVBoxLayout(status_card)
+        status_layout.setContentsMargins(16, 14, 16, 14)
+        status_layout.setSpacing(10)
+
+        status_header = QHBoxLayout()
+        status_title = QLabel('Status & Activity')
+        status_title.setObjectName('sectionTitle')
+
+        self.clear_log_btn = QPushButton('Clear')
+        self.clear_log_btn.setObjectName('neutralBtn')
         self.clear_log_btn.clicked.connect(self.clear_logs)
+        self.clear_log_btn.setMinimumHeight(34)
+        self.clear_log_btn.setMinimumWidth(82)
 
-        self.message_box = QTextEdit(frame)
-        self.message_box.setGeometry(40, 292, 520, 160)
+        status_header.addWidget(status_title)
+        status_header.addStretch(1)
+        status_header.addWidget(self.clear_log_btn)
+        status_layout.addLayout(status_header)
+
+        self.message_box = QTextEdit()
         self.message_box.setReadOnly(True)
+        self.message_box.setMinimumHeight(220)
+        self.message_box.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        status_layout.addWidget(self.message_box)
 
-        self.disclaimer_btn = QPushButton('Disclaimer', frame)
-        self.disclaimer_btn.setGeometry(40, 466, 100, 34)
+        main_layout.addWidget(status_card, 1)
+
+        footer_layout = QHBoxLayout()
+        self.disclaimer_btn = QPushButton('Disclaimer')
+        self.disclaimer_btn.setObjectName('neutralBtn')
+        self.disclaimer_btn.setMinimumHeight(36)
         self.disclaimer_btn.clicked.connect(self.show_disclaimer)
+        footer_layout.addWidget(self.disclaimer_btn)
+        footer_layout.addStretch(1)
+        main_layout.addLayout(footer_layout)
 
         self.apply_texts(frame)
 
@@ -142,18 +278,8 @@ class WDSecurityWindow:
         self.check_wd_drive()
 
     def apply_texts(self, frame):
-        frame.setWindowTitle('WD-Security')
-        self.decrypt_btn.setText('Unlock Drive')
+        frame.setWindowTitle('WD Security for Linux')
         self.decrypt_btn.setEnabled(False)
-        self.pw_label.setText('Password:')
-        self.message_label.setText('Status / Error Log:')
-        self.title_label.setText('WD Security for Linux')
-        self.header_label.setText('Unofficial unlock helper')
-        self.exit_btn.setText('Exit')
-        self.mount_btn.setText('Mount Drive')
-        self.disclaimer_btn.setText('Disclaimer')
-        self.clear_log_btn.setText('Clear')
-        self.show_pw_check.setText('Show password')
 
     def append_log(self, msg):
         self.message_box.append(msg)
@@ -363,7 +489,7 @@ class WDSecurityWindow:
 
     def show_disclaimer(self):
         QMessageBox.information(
-            None,
+            self.frame,
             'Disclaimer',
             'This utility enables temporary unlock for modern WD drives that support '
             'hardware-level link encryption.\nIt does not support permanent unlock '
