@@ -10,11 +10,16 @@ if ! command -v pyinstaller >/dev/null 2>&1; then
   exit 1
 fi
 
-# This project is PyQt4/Python2-era. Use PYTHON_BIN to pin interpreter if needed.
-: "${PYTHON_BIN:=python}"
+# This project is Python2/PyQt4 based.
+if command -v python2 >/dev/null 2>&1; then
+  PYTHON_BIN="${PYTHON_BIN:-python2}"
+else
+  PYTHON_BIN="${PYTHON_BIN:-python}"
+fi
 
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
-  echo "Configured PYTHON_BIN '$PYTHON_BIN' was not found."
+  echo "No suitable Python runtime found for build."
+  echo "Install python2 (recommended for this project), or set PYTHON_BIN explicitly."
   exit 1
 fi
 
@@ -28,4 +33,3 @@ rm -rf build dist
   wd-security.py
 
 echo "Build complete: $ROOT_DIR/dist/wd-security"
-echo "Run with root privileges using: ./wd-security-launcher.sh"
