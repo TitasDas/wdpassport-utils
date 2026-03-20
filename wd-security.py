@@ -5,363 +5,448 @@
 # github: https://github.com/electronicsguy/
 #
 # Based on the original design by:
-# funkypopcorn (https://github.com/funkypopcorn) 
+# funkypopcorn (https://github.com/funkypopcorn)
 #
-# Changes:
-# 1. Major code cleanup
-# 2. Added code to detect connected drives, lock status
-# 3. Check sudo and required packages at startup
+# Improvements in this fork:
+# 1. UI refresh and usability tweaks
+# 2. Safer subprocess usage and password handling
+# 3. Better drive/utility checks with clearer errors
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import pyqtSlot
-import subprocess
-import cookpw
+from distutils.spawn import find_executable
 import os
+import re
+import subprocess
+import sys
+import tempfile
 
 # Store the partition name in this variable
-PARTNAME=''
+PARTNAME = ''
 
-try:
-    _fromUtf8 = QtCore.QString.fromUtf8
-except AttributeError:
-    def _fromUtf8(s):
-        return s
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+COOKPW_PATH = os.path.join(SCRIPT_DIR, 'cookpw.py')
 
-try:
-    _encoding = QtGui.QApplication.UnicodeUTF8
-    def _translate(context, text, disambig):
-        return QtGui.QApplication.translate(context, text, disambig, _encoding)
-except AttributeError:
-    def _translate(context, text, disambig):
-        return QtGui.QApplication.translate(context, text, disambig)
+SCSI_UNLOCK_CMD = [
+    'c1', 'e1', '00', '00', '00', '00', '00', '00', '28', '00'
+]
 
-fpathc = os.path.dirname(os.path.abspath(__file__))+"/cookpw.py"
-fpathp = os.path.dirname(os.path.abspath(__file__))+"/password.bin"
+
+def _run_cmd(args, check=False):
+    """Run command and return stdout as text (Python 2/3 safe enough here)."""
+    proc = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True
+    )
+    out, err = proc.communicate()
+    if check and proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, args, output=out + err)
+    return out.strip(), err.strip(), proc.returncode
+
+
+def _is_executable_available(binary):
+    return find_executable(binary) is not None
+
 
 class MessageBoxDemo(QtGui.QWidget):
     def __init__(self, title, msg):
-        """Constructor"""
-        # super(DialogDemo, self).__init__()
         QtGui.QWidget.__init__(self)
-        #self.setWindowTitle("MessageBox Demo")
-        
-	QtGui.QMessageBox.information(self, title, msg)
+        QtGui.QMessageBox.information(self, title, msg)
+
 
 class Ui_Frame(object):
     def setupUi(self, Frame):
-        Frame.setObjectName(_fromUtf8("Frame"))
-        Frame.resize(603, 478)
+        Frame.setObjectName('Frame')
+        Frame.resize(640, 520)
         Frame.setFrameShape(QtGui.QFrame.StyledPanel)
         Frame.setFrameShadow(QtGui.QFrame.Raised)
-        
-	myTitleFont = QtGui.QFont()
-        myTitleFont.setFamily(_fromUtf8("Waree"))
+        Frame.setStyleSheet('''
+            QFrame { background-color: #f4f7fb; }
+            QLabel#titleLabel { color: #0f2a56; }
+            QLabel#header1Label { color: #33507d; }
+            QLineEdit {
+                border: 1px solid #9fb2ce;
+                border-radius: 6px;
+                padding: 6px;
+                background: #ffffff;
+            }
+            QTextEdit {
+                border: 1px solid #9fb2ce;
+                border-radius: 6px;
+                background: #ffffff;
+            }
+            QPushButton {
+                background-color: #214e8a;
+                color: #ffffff;
+                border: 0;
+                border-radius: 6px;
+                padding: 8px 12px;
+            }
+            QPushButton:disabled {
+                background-color: #9aa7ba;
+            }
+            QCheckBox { color: #1f3556; }
+        ''')
+
+        myTitleFont = QtGui.QFont()
+        myTitleFont.setFamily('Waree')
         myTitleFont.setPointSize(18)
         myTitleFont.setBold(True)
-        myTitleFont.setWeight(75)
 
-	myHeaderFont = QtGui.QFont()
-        myHeaderFont.setFamily(_fromUtf8("Times"))
+        myHeaderFont = QtGui.QFont()
+        myHeaderFont.setFamily('Times')
         myHeaderFont.setPointSize(12)
         myHeaderFont.setBold(True)
-        myHeaderFont.setWeight(75)
-	myHeaderFont.setItalic(True)
+        myHeaderFont.setItalic(True)
 
-	self.titleLabel = QtGui.QLabel(Frame)
-        self.titleLabel.setGeometry(QtCore.QRect(50, 30, 511, 30))
+        self.titleLabel = QtGui.QLabel(Frame)
+        self.titleLabel.setGeometry(QtCore.QRect(50, 24, 540, 32))
         self.titleLabel.setFont(myTitleFont)
-        self.titleLabel.setLineWidth(1)
-        self.titleLabel.setObjectName(_fromUtf8("titleLabel"))
+        self.titleLabel.setObjectName('titleLabel')
 
-	self.header1Label = QtGui.QLabel(Frame)
-        self.header1Label.setGeometry(QtCore.QRect(50, 60, 511, 30))
+        self.header1Label = QtGui.QLabel(Frame)
+        self.header1Label.setGeometry(QtCore.QRect(50, 58, 540, 28))
         self.header1Label.setFont(myHeaderFont)
-        self.header1Label.setLineWidth(1)
-        self.header1Label.setObjectName(_fromUtf8("header1Label"))
-
-	#self.footerLabel = QtGui.QLabel(Frame)
-        #self.footerLabel.setGeometry(QtCore.QRect(50, 420, 541, 41))
-        #self.footerLabel.setObjectName(_fromUtf8("footerLabel"))
+        self.header1Label.setObjectName('header1Label')
 
         self.pwLabel = QtGui.QLabel(Frame)
-        self.pwLabel.setGeometry(QtCore.QRect(65, 125, 65, 21))
-        self.pwLabel.setObjectName(_fromUtf8("pwLabel"))
+        self.pwLabel.setGeometry(QtCore.QRect(52, 118, 85, 24))
+        self.pwLabel.setObjectName('pwLabel')
 
         self.pwBox = QtGui.QLineEdit(Frame)
-        self.pwBox.setGeometry(QtCore.QRect(140, 120, 381, 31))
-        self.pwBox.setObjectName(_fromUtf8("pwBox"))
-	self.pwBox.setEchoMode(QtGui.QLineEdit.Password)
-	self.pwBox.setPlaceholderText('Enter password to unlock WD drive')
+        self.pwBox.setGeometry(QtCore.QRect(140, 114, 420, 34))
+        self.pwBox.setObjectName('pwBox')
+        self.pwBox.setEchoMode(QtGui.QLineEdit.Password)
+        self.pwBox.setPlaceholderText('Enter password to unlock WD drive')
 
-	self.decryptBtn = QtGui.QPushButton(Frame)
-        self.decryptBtn.setGeometry(QtCore.QRect(40, 190, 141, 51))
-        self.decryptBtn.setObjectName(_fromUtf8("decryptBtn"))
-	self.decryptBtn.clicked.connect(self.decryptWD)
+        self.showPwCheck = QtGui.QCheckBox(Frame)
+        self.showPwCheck.setGeometry(QtCore.QRect(140, 152, 180, 24))
+        self.showPwCheck.setObjectName('showPwCheck')
+        self.showPwCheck.stateChanged.connect(self.togglePasswordVisibility)
+
+        self.decryptBtn = QtGui.QPushButton(Frame)
+        self.decryptBtn.setGeometry(QtCore.QRect(40, 192, 160, 50))
+        self.decryptBtn.setObjectName('decryptBtn')
+        self.decryptBtn.clicked.connect(self.decryptWD)
 
         self.mountBtn = QtGui.QPushButton(Frame)
         self.mountBtn.setEnabled(False)
-        self.mountBtn.setGeometry(QtCore.QRect(210, 190, 151, 51))
-        self.mountBtn.setObjectName(_fromUtf8("mountBtn"))
-	self.mountBtn.clicked.connect(self.mountWD)
+        self.mountBtn.setGeometry(QtCore.QRect(220, 192, 160, 50))
+        self.mountBtn.setObjectName('mountBtn')
+        self.mountBtn.clicked.connect(self.mountWD)
 
         self.exitBtn = QtGui.QPushButton(Frame)
-        self.exitBtn.setGeometry(QtCore.QRect(390, 190, 151, 51))
-        self.exitBtn.setObjectName(_fromUtf8("exitBtn"))
-	self.exitBtn.clicked.connect(Frame.close)
+        self.exitBtn.setGeometry(QtCore.QRect(400, 192, 160, 50))
+        self.exitBtn.setObjectName('exitBtn')
+        self.exitBtn.clicked.connect(Frame.close)
 
         self.messageLabel = QtGui.QLabel(Frame)
-        self.messageLabel.setGeometry(QtCore.QRect(40, 270, 121, 21))
-        self.messageLabel.setObjectName(_fromUtf8("messageLabel"))
+        self.messageLabel.setGeometry(QtCore.QRect(40, 260, 180, 24))
+        self.messageLabel.setObjectName('messageLabel')
+
+        self.clearLogBtn = QtGui.QPushButton(Frame)
+        self.clearLogBtn.setGeometry(QtCore.QRect(470, 258, 90, 28))
+        self.clearLogBtn.setObjectName('clearLogBtn')
+        self.clearLogBtn.clicked.connect(self.clearLogs)
 
         self.messageBox = QtGui.QTextEdit(Frame)
-        self.messageBox.setGeometry(QtCore.QRect(40, 300, 521, 111))
-        self.messageBox.setObjectName(_fromUtf8("messageBox"))
+        self.messageBox.setGeometry(QtCore.QRect(40, 292, 520, 160))
+        self.messageBox.setObjectName('messageBox')
+        self.messageBox.setReadOnly(True)
 
-	self.disclaimerBtn = QtGui.QPushButton('Disclaimer', Frame)
-	#self.disclaimerBtn.move(40, 430)
-        self.disclaimerBtn.setGeometry(40, 430, 90, 30)
-	self.disclaimerBtn.clicked.connect(self.showDisclaimer)
+        self.disclaimerBtn = QtGui.QPushButton('Disclaimer', Frame)
+        self.disclaimerBtn.setGeometry(40, 466, 100, 34)
+        self.disclaimerBtn.clicked.connect(self.showDisclaimer)
 
         self.retranslateUi(Frame)
-	self.checkWDdrive()
+        self.checkWDdrive()
 
-        QtCore.QObject.connect(self.pwBox, QtCore.SIGNAL(_fromUtf8("textChanged(QString)")), self.pwBox_text_changed)
-	QtCore.QObject.connect(self.pwBox, QtCore.SIGNAL(_fromUtf8("returnPressed()")), self.pwBox_check_text)
-	self.pwBox.setFocus()
+        QtCore.QObject.connect(self.pwBox, QtCore.SIGNAL('textChanged(QString)'), self.pwBox_text_changed)
+        QtCore.QObject.connect(self.pwBox, QtCore.SIGNAL('returnPressed()'), self.pwBox_check_text)
+        self.pwBox.setFocus()
         QtCore.QMetaObject.connectSlotsByName(Frame)
 
     def retranslateUi(self, Frame):
-        Frame.setWindowTitle(_translate("Frame", "WD-Security", None))
-        self.decryptBtn.setText(_translate("Frame", "Unlock Drive", None))
-	self.decryptBtn.setEnabled(False)
-        self.pwLabel.setText(_translate("Frame", "Password:", None))
-        self.messageLabel.setText(_translate("Frame", "Status/Error-Log:", None))
-        self.titleLabel.setText(_translate("Frame", "WD Security for Linux", None))
-	self.header1Label.setText(_translate("Frame", "An unofficial solution", None))
-        self.exitBtn.setText(_translate("Frame", "Exit", None))
-        self.mountBtn.setText(_translate("Frame", "Mount Drive", None))
-        #self.footerLabel.setText(_translate("Frame", "<html><head/><body><p><span style=\" font-size:10pt; font-style:italic;\">(This utility has only been tested with one WD locked drive attached. <br/>Please do not connect more than 1 locked USB drives!)</span></p></body></html>", None))
-	self.disclaimerBtn.setText(_translate("Frame", "Disclaimer", None))
+        Frame.setWindowTitle('WD-Security')
+        self.decryptBtn.setText('Unlock Drive')
+        self.decryptBtn.setEnabled(False)
+        self.pwLabel.setText('Password:')
+        self.messageLabel.setText('Status / Error Log:')
+        self.titleLabel.setText('WD Security for Linux')
+        self.header1Label.setText('Unofficial unlock helper')
+        self.exitBtn.setText('Exit')
+        self.mountBtn.setText('Mount Drive')
+        self.disclaimerBtn.setText('Disclaimer')
+        self.clearLogBtn.setText('Clear')
+        self.showPwCheck.setText('Show password')
 
-    # Grey-out button if no password entered
+    def appendLog(self, msg):
+        self.messageBox.append(msg)
+
+    @pyqtSlot(int)
+    def togglePasswordVisibility(self, state):
+        if state == QtCore.Qt.Checked:
+            self.pwBox.setEchoMode(QtGui.QLineEdit.Normal)
+        else:
+            self.pwBox.setEchoMode(QtGui.QLineEdit.Password)
+
+    @pyqtSlot()
+    def clearLogs(self):
+        self.messageBox.clear()
+
     @pyqtSlot(str)
     def pwBox_text_changed(self, text):
-        if text:  # Check to see if text is filled in
-	    self.decryptBtn.setEnabled(True)
-        else:
-            self.decryptBtn.setEnabled(False)
+        self.decryptBtn.setEnabled(bool(text))
 
-    # Check that password is not empty when ENTER is pressed
     @pyqtSlot(str)
     def pwBox_check_text(self):
-	if self.pwBox.text().length() > 0:
-	    self.decryptWD()
-	else:
-	    self.pwBox.setFocus()
+        if self.pwBox.text().length() > 0:
+            self.decryptWD()
+        else:
+            self.pwBox.setFocus()
 
     def checkWDdrive(self):
-	cmd = 'lsusb |grep -i "Western Digital" | sed -e \'s/:.*//\''
-	p = subprocess.Popen(cmd, universal_newlines=True, shell=True, 
-		stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	pout = p.stdout.read()
-	retcode = p.wait()
-	if pout == "":	
-		self.messageBox.append("No Western Digital drive attached.")
-		self.messageBox.append("Please attach a compatible drive and restart.")
-		self.pwBox.setEnabled(False)
-	else:
-		self.messageBox.append("Western Digital Drive found at: " + pout)
-	
-		cmd2 = 'lsblk | grep -i "WD Unlocker" | wc -l'
-		p2 = subprocess.Popen(cmd2, universal_newlines=True, shell=True, 
-			stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-		pout2 = p2.stdout.read()
-		retcode2 = p2.wait()
-		if int(pout2) == 0:
-			self.messageBox.append("Either the drive is not locked or doesn't support WD security")
-			self.messageBox.append("If you believe this is false, please re-connect the disk and try again.")
-			self.pwBox.setEnabled(False)
-		else:
-			self.messageBox.append("Checking drive lock status...")
-			self.checkUnlockStatus()
+        out, _, _ = _run_cmd(['lsusb'])
+        wd_usb_lines = []
+        for line in out.splitlines():
+            if 'western digital' in line.lower():
+                wd_usb_lines.append(line)
+
+        if not wd_usb_lines:
+            self.appendLog('No Western Digital drive attached.')
+            self.appendLog('Please attach a compatible drive and restart.')
+            self.pwBox.setEnabled(False)
+            return
+
+        for line in wd_usb_lines:
+            self.appendLog('Western Digital drive found at: ' + line)
+
+        lsblk_out, _, _ = _run_cmd(['lsblk'])
+        if 'wd unlocker' not in lsblk_out.lower():
+            self.appendLog("Either the drive is not locked or doesn't support WD security.")
+            self.appendLog('If you believe this is false, reconnect the disk and try again.')
+            self.pwBox.setEnabled(False)
+            return
+
+        self.appendLog('Checking drive lock status...')
+        self.checkUnlockStatus()
 
     def checkUnlockStatus(self):
-	global PARTNAME
-	
-	numLines = self.getPartname()
-	# to-do: the logic here needs to be changed as in:
-	# if infact multiple locked drives are connected, it'll output
-	# multiple lines (sdb, sdc, etc). That doesn't necessarily mean they are unlocked
-	# A per-drive check needs to be made for any partitions identified (like sdb1, sdb2, etc)
-	if numLines == 0:
-		self.messageBox.append("Error locating WD drive! Please re-connect and try again.")
-	elif numLines == 1:
-		self.messageBox.append("Drive appears to be locked")
-	else:
-		self.messageBox.append("Drive is already unlocked!")
-		self.pwBox.setEnabled(False)
-		self.messageBox.append("Drive device name: " + PARTNAME)
-		self.checkMountStatus()
+        global PARTNAME
+
+        num_lines = self.getPartname()
+        if num_lines == 0:
+            self.appendLog('Error locating WD drive. Please reconnect and try again.')
+        elif num_lines == 1:
+            self.appendLog('Drive appears to be locked.')
+        else:
+            self.appendLog('Drive appears to be already unlocked.')
+            self.pwBox.setEnabled(False)
+            self.appendLog('Drive device name: ' + PARTNAME)
+            self.checkMountStatus()
 
     def getPartname(self):
-	global PARTNAME
-	
-	cmd = 'ls  -l /dev/disk/by-id | grep "/sd" | grep -i "usb-WD" | perl -pe \'s/(.*?)usb-WD_(.*)-\d:\d -> \.\.\/\.\.\/(.*?)/$2 $3/\''
-	p = subprocess.Popen(cmd, universal_newlines=True, shell=True, 
-		stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	lines = p.stdout.readlines()
-	numLines = len(lines)
-	retcode = p.wait()
-	PARTNAME = str(lines[0][-4:-1])	    # ignore trailing newline char
+        global PARTNAME
 
-	return numLines
+        disk_by_id = '/dev/disk/by-id'
+        if not os.path.isdir(disk_by_id):
+            PARTNAME = ''
+            return 0
+
+        partnames = []
+        for entry in os.listdir(disk_by_id):
+            if 'usb-WD' not in entry:
+                continue
+            full = os.path.join(disk_by_id, entry)
+            if not os.path.islink(full):
+                continue
+            try:
+                target = os.path.realpath(full)
+            except OSError:
+                continue
+            base = os.path.basename(target)
+            if re.match(r'^sd[a-z]+$', base):
+                partnames.append(base)
+
+        # Stable order for deterministic behavior.
+        partnames = sorted(set(partnames))
+        if partnames:
+            PARTNAME = partnames[0]
+        else:
+            PARTNAME = ''
+
+        return len(partnames)
 
     def checkMountStatus(self):
-	# to-do: add code to check if partitions are already mounted
-	self.mountBtn.setEnabled(True)
+        self.mountBtn.setEnabled(True)
 
     def decryptWD(self):
         self.callCookingPW()
 
-    def callCookingPW(self):
-        self.messageBox.append("Calling external cookpw-script...")
+    def _create_password_blob(self, pw):
+        """Generate password payload with cookpw and write it to a secure temp file."""
+        fd, path = tempfile.mkstemp(prefix='wdpass_', dir=SCRIPT_DIR)
+        os.close(fd)
+        os.chmod(path, 0o600)
 
-	# finish processing all pending events
+        proc = subprocess.Popen(
+            [sys.executable, COOKPW_PATH, '--stdin'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        out, err = proc.communicate(pw)
+        if proc.returncode != 0:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            raise RuntimeError(err.strip() or 'cookpw.py failed')
+
+        handle = open(path, 'wb')
+        try:
+            handle.write(out)
+        finally:
+            handle.close()
+
+        return path
+
+    def callCookingPW(self):
+        self.appendLog('Preparing password payload...')
         app.processEvents()
 
-        try:
-            pw = str(self.pwBox.text())
-	    self.pwBox.clear()
-	    fpathc = os.path.dirname(os.path.abspath(__file__))+"/cookpw.py"
-            subprocess.check_call("python "+fpathc+" "+pw+" >"+fpathp, shell=True)
-    
-        except subprocess.CalledProcessError:       
-            self.messageBox.append("Cannot execute 'cookpw.py' script.")
-	    self.messageBox.append("Please check if the path is correct and retry.")
+        pw = str(self.pwBox.text())
+        self.pwBox.clear()
+
+        if not pw:
+            self.appendLog('Password cannot be empty.')
             return
+
         try:
-            with open(fpathp):
-                self.messageBox.append("Sending SCSI commands to unlock the drive...")
-                self.unlockDrive()
-        except IOError:
-            self.messageBox.append("Cannot create 'password.bin' file. Check paths, permissions and retry.")
+            payload_path = self._create_password_blob(pw)
+        except Exception as exc:
+            self.appendLog('Cannot prepare password payload: {0}'.format(exc))
             return
-        
 
-    def unlockDrive(self):
+        self.appendLog('Sending SCSI commands to unlock the drive...')
+        self.unlockDrive(payload_path)
+
+    def _find_sg_devices(self):
+        out, _, rc = _run_cmd(['/bin/dmesg'])
+        if rc != 0:
+            return []
+
+        devices = []
+        for line in out.splitlines():
+            if 'type 13' not in line:
+                continue
+            match = re.search(r'\b(sg\d+)\b', line)
+            if match:
+                devices.append(match.group(1))
+        return sorted(set(devices))
+
+    def unlockDrive(self, payload_path):
         try:
-	    # to-do: make this check a separate subroutine
-	    # multiple drives could be supported by showing a list of 'sg<nn>' ids
-	    # and selecting the required one
-	    # also, I think this check is erroneous. the multiple sg<nn> entries are still reported
-	    # by dmesg, even after the other drives are removed
-            from subprocess import check_output as qx
-            out = qx("/bin/dmesg | grep sg | grep \"type 13\" | awk \'{print $8}\'",shell=True)
-            # check # drives attached
-	    # each drive gets a dmesg id of the form 'sg<nn>'
-            cmp = out.split( )[0]
-
-	    # sometimes, the type(sgXX) is in the 7th column and not 8th
-	    if cmp == 'type':
-		out = qx("/bin/dmesg | grep sg | grep \"type 13\" | awk \'{print $7}\'",shell=True)
-                cmp = out.split( )[0]
-
-            multipleDevices = False
-            for word in out.split( ):
-                if not cmp==word:
-                   #multipleDevices = True
-                   break
-            if not multipleDevices:
-                #finally lets send the SCSI command to encrypt
-                self.messageBox.append("Secure Harddrive identified at /dev/" + cmp)
-                try:
-                    subprocess.check_call("sudo sg_raw -s 40 -i " + fpathp + " /dev/" + cmp + " c1 e1 00 00 00 00 00 00 28 00", shell=True)
-                    self.messageBox.append("The WD Drive is now unlocked and can be mounted!")
-		    
-                except subprocess.CalledProcessError:
-                    self.messageBox.append("Failure while sending SCSI decrypt command. Check password and connections.")
-                    return
-
-            else:
-                self.messageBox.append("Multiple SCSI 'type 13' devices recognized.")
-		self.messageBox.append("Please unplug everything except the desired drive and retry.")
+            sg_devices = self._find_sg_devices()
+            if not sg_devices:
+                self.appendLog("Failure: couldn't find an sg 'type 13' device within dmesg.")
                 return
 
-        except subprocess.CalledProcessError:
-            self.messageBox.append("Failure couldn't find 'sg' type within dmesg!")
-            return
+            if len(sg_devices) > 1:
+                self.appendLog("Multiple SCSI 'type 13' devices recognized.")
+                self.appendLog('Please unplug everything except the desired drive and retry.')
+                return
 
-	# Drive Unlock successful. So try and automount partitions
-	self.pwBox.setEnabled(False)
-        self.decryptBtn.setEnabled(False)
-	self.mountWD()
+            sg_dev = sg_devices[0]
+            self.appendLog('Secure hard drive identified at /dev/' + sg_dev)
 
+            cmd = ['sg_raw', '-s', '40', '-i', payload_path, '/dev/' + sg_dev] + SCSI_UNLOCK_CMD
+            try:
+                _run_cmd(cmd, check=True)
+                self.appendLog('The WD drive is now unlocked and can be mounted!')
+            except subprocess.CalledProcessError:
+                self.appendLog('Failure while sending SCSI decrypt command. Check password and connections.')
+                return
+
+            # Drive unlock successful. Try automounting partitions.
+            self.pwBox.setEnabled(False)
+            self.decryptBtn.setEnabled(False)
+            self.mountWD()
+        finally:
+            try:
+                os.unlink(payload_path)
+            except OSError:
+                pass
 
     def mountWD(self):
-	global PARTNAME
-        
-	# Needs to be called since PARTNAME may be empty at start
-	self.getPartname()
+        global PARTNAME
 
-	# Note: 'partprobe' will always exit with an error (The partition's data region doesn't occupy the entire partition)
-	# since the virtual CD drive is not writable
-	# partprobe simply informs the OS that new partitions are available on the unlocked drive
-	# They are actually mounted using the 'udisksctl' command. (or by clicking on the partiion name in the file
-	# manager GUI, if it supports automount
+        self.getPartname()
+        if not PARTNAME:
+            self.appendLog('Cannot determine drive device name. Please mount manually.')
+            return
 
-       	subprocess.call("sudo partprobe 2>/dev/null", shell=True)
-       	self.messageBox.append("Available devices have been updated!")
+        _run_cmd(['partprobe'])
+        self.appendLog('Available devices have been updated.')
 
-	# to-do: see if the hard-coded first partition '1' needs to be made flexible
-	devname = '/dev/' + PARTNAME + '1'
-	self.messageBox.append('Mounting device: ' + devname)
-	subprocess.call("udisksctl mount -b " + devname + " &>/dev/null", shell=True)
+        # Keep legacy behavior: attempt to mount partition 1.
+        devname = '/dev/' + PARTNAME + '1'
+        self.appendLog('Mounting device: ' + devname)
+        _, _, mount_rc = _run_cmd(['udisksctl', 'mount', '-b', devname])
 
-       	self.messageBox.append("WD Harddrive decrypted and mounted successfully!")
+        if mount_rc == 0:
+            self.appendLog('WD hard drive decrypted and mounted successfully!')
+        else:
+            self.appendLog('Drive decrypted, but automount failed. Please mount manually.')
 
-	self.messageBox.append('\nNote: In some rare cases, the partitions may still not be mounted.')
-	self.messageBox.append('In this case, please mount them manually using "mount".')
-
-	self.mountBtn.setEnabled(False)        
-
-	return
+        self.appendLog('In some cases partitions may not mount automatically.')
+        self.appendLog('If needed, mount them manually using "mount".')
+        self.mountBtn.setEnabled(False)
 
     def showDisclaimer(self):
-	form = MessageBoxDemo("Disclaimer", "This utility enables temporary unlock for modern WD drives which support hardware level link encryption.\nIt does not support permanent unlocks(removing security) or the process of locking the drive in the first place.\n\nThis utility is not officially licenced by Western Digital. Western Digital Security is a registered trademark of Western Digital. All other trademarks belong to their respective owners.\n\nThis utility has only been tested with one WD locked drive attached.\nPlease do not connect more than 1 locked USB drives!")
-    	#form.show()
-    
+        MessageBoxDemo(
+            'Disclaimer',
+            'This utility enables temporary unlock for modern WD drives that support '
+            'hardware-level link encryption.\nIt does not support permanent unlock '
+            '(removing security) or initial locking.\n\nThis utility is not '
+            'officially licensed by Western Digital. Western Digital Security is a '
+            'registered trademark of Western Digital.\n\nThis utility has only been '
+            'tested with one WD locked drive attached.\nPlease do not connect more '
+            'than one locked USB drive.'
+        )
+
 
 def prompt_sudo():
     if os.geteuid() != 0:
         print >> sys.stderr, "This program requires root permissions. Please try again by prefixing 'sudo'."
         sys.exit(1)
 
+
 def CheckRequiredUtils():
-        try:
-            subprocess.check_call("command -v sg_raw >/dev/null 2>&1", shell=True)
-        except subprocess.CalledProcessError:
-            print "This program requires the 'sg3-utils' (sg3_utils) package to be installed."
-	    sys.exit(1)
+    required_bins = ['sg_raw', 'partprobe', 'lsusb', 'lsblk', 'udisksctl']
+    missing = []
+    for binary in required_bins:
+        if not _is_executable_available(binary):
+            missing.append(binary)
 
-	try:
-            subprocess.check_call("command -v partprobe >/dev/null 2>&1", shell=True)
-        except subprocess.CalledProcessError:
-            print "This program requires the 'partprobe' package to be installed."
-	    sys.exit(1)
+    if missing:
+        print "Missing required system tools: {0}".format(', '.join(missing))
+        print "Please install the required packages and retry."
+        sys.exit(1)
 
 
-if __name__ == "__main__":
-# ref: http://pyqt.sourceforge.net/Docs/PyQt4/qapplication.html
-    import sys
+if __name__ == '__main__':
+    # ref: http://pyqt.sourceforge.net/Docs/PyQt4/qapplication.html
     global app
     app = QtGui.QApplication(sys.argv)
-    hFrame = QtGui.QFrame()    
+    hFrame = QtGui.QFrame()
     hWin = Ui_Frame()
     hWin.setupUi(hFrame)
-    
+
     prompt_sudo()
     CheckRequiredUtils()
     hFrame.show()
     status = app.exec_()   # run app, show window, wait for input
     sys.exit(status)       # terminate program with a status code returned from app
-

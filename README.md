@@ -1,9 +1,10 @@
-## Introduction
+# wdpassport-utils
 
-This project is based on the work done by the following people: KenMacD, funkypopcorn and Dan Lukes.
+Source: forked from https://github.com/TitasDas/wdpassport-utils (original work by KenMacD, funkypopcorn, Dan Lukes, and later contributors).
 
-I re-wrote the GUI part of the unlocker to make it more user friendly. The script can be executed as:
+Purpose: unlock WD Security locked external drives on Linux and mount them after successful authentication.
 
-sudo ./wd-security.py
-
-More updates coming. Please email me your comments.
+What I changed in this update:
+- Improved the PyQt UI: cleaner layout/colors, read-only log area, `Show password`, and `Clear log`.
+- Hardened security: removed shell-based password execution, avoided password in process args, used secure temporary payload file with cleanup.
+- Improved command safety: switched to safer subprocess calls and stronger required-tool checks.
