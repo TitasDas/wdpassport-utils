@@ -1,0 +1,13 @@
+NOTICE
+
+This project includes and builds upon code and ideas from:
+- https://github.com/KenMacD/wdpassport-utils
+- related contributions referenced by upstream maintainers (including funkypopcorn, Dan Lukes, and others)
+
+Important licensing note:
+- At the time of this notice, the upstream repository does not publish an explicit open-source license.
+- This repository keeps attribution to upstream authors and preserves references to the original source.
+- No claim is made that upstream code is relicensed here.
+
+Local modifications in this repository include UI redesign, Python3/PyQt5 migration,
+launcher/packaging updates, security hardening, and documentation improvements.

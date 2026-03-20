@@ -2,6 +2,8 @@
 
 Source: originally from https://github.com/KenMacD/wdpassport-utils.
 
+See [NOTICE](NOTICE) for upstream attribution and licensing context.
+
 ## What you can do
 - Unlock a password-protected WD Security drive.
 - Mount the drive right after unlock.
