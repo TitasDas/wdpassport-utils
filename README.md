@@ -1,8 +1,11 @@
 # wdpassport-utils
 
-Source: originally from https://github.com/KenMacD/wdpassport-utils.
+Credits / source chain:
+- Immediate fork source: https://github.com/TitasDas/wdpassport-utils
+- GUI rewrite contributor: https://github.com/electronicsguy
+- Original upstream: https://github.com/KenMacD/wdpassport-utils
 
-See [NOTICE](NOTICE) for upstream attribution and licensing context.
+See [NOTICE](NOTICE) for full attribution and licensing context.
 
 ## What you can do
 - Unlock a password-protected WD Security drive.

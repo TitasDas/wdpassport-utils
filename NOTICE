@@ -1,12 +1,18 @@
 NOTICE
 
-This project includes and builds upon code and ideas from:
-- https://github.com/KenMacD/wdpassport-utils
-- related contributions referenced by upstream maintainers (including funkypopcorn, Dan Lukes, and others)
+This project includes and builds upon code and ideas from the following chain:
+- Original upstream: https://github.com/KenMacD/wdpassport-utils
+- Later GUI rewrite and related updates by electronicsguy: https://github.com/electronicsguy
+- Immediate fork source used for this repository: https://github.com/TitasDas/wdpassport-utils
+
+Additional contributors referenced by upstream maintainers include funkypopcorn, Dan Lukes,
+and others.
 
 Important licensing note:
-- At the time of this notice, the upstream repository does not publish an explicit open-source license.
-- This repository keeps attribution to upstream authors and preserves references to the original source.
+- At the time of this notice, the original upstream repository does not publish an explicit
+  open-source license.
+- This repository keeps attribution to upstream authors and preserves references to original
+  sources.
 - No claim is made that upstream code is relicensed here.
 
 Local modifications in this repository include UI redesign, Python3/PyQt5 migration,
