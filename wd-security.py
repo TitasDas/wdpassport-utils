@@ -9,9 +9,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 
 from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtGui import QFont, QFontDatabase
+from PyQt5.QtGui import QFontDatabase
 from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -49,8 +50,8 @@ class WDSecurityWindow:
     def setup_ui(self, frame):
         self.frame = frame
         frame.setObjectName('rootFrame')
-        frame.resize(860, 620)
-        frame.setMinimumSize(760, 560)
+        frame.resize(900, 640)
+        frame.setMinimumSize(780, 560)
         frame.setFrameShape(QFrame.StyledPanel)
         frame.setFrameShadow(QFrame.Raised)
         frame.setStyleSheet('''
@@ -67,7 +68,7 @@ class WDSecurityWindow:
             }
             QLabel#titleLabel {
                 color: #ffffff;
-                font-size: 28px;
+                font-size: 30px;
                 font-weight: 700;
             }
             QLabel#subtitleLabel {
@@ -81,6 +82,15 @@ class WDSecurityWindow:
                 padding: 4px 10px;
                 font-size: 11px;
                 font-weight: 600;
+            }
+            QLabel#stateChip {
+                color: #11461f;
+                background: #dff5e6;
+                border: 1px solid #b9e5c8;
+                border-radius: 10px;
+                padding: 4px 12px;
+                font-size: 11px;
+                font-weight: 700;
             }
             QFrame#panelCard {
                 background: #ffffff;
@@ -106,6 +116,7 @@ class WDSecurityWindow:
             }
             QLineEdit:focus {
                 border: 1px solid #2d6fb4;
+                background: #f9fcff;
             }
             QCheckBox {
                 color: #274267;
@@ -122,19 +133,31 @@ class WDSecurityWindow:
                 background: #1d5fa9;
                 color: #ffffff;
             }
+            QPushButton#primaryBtn:hover { background: #1a548f; }
+            QPushButton#primaryBtn:pressed { background: #164877; }
+
             QPushButton#secondaryBtn {
                 background: #3e6ea8;
                 color: #ffffff;
             }
+            QPushButton#secondaryBtn:hover { background: #355f90; }
+            QPushButton#secondaryBtn:pressed { background: #2e537d; }
+
             QPushButton#neutralBtn {
                 background: #eef3fb;
                 color: #21416a;
                 border: 1px solid #c8d5e8;
             }
+            QPushButton#neutralBtn:hover { background: #e4edf9; }
+            QPushButton#neutralBtn:pressed { background: #d8e5f6; }
+
             QPushButton#dangerBtn {
                 background: #d84f4f;
                 color: #ffffff;
             }
+            QPushButton#dangerBtn:hover { background: #bf4444; }
+            QPushButton#dangerBtn:pressed { background: #a93a3a; }
+
             QPushButton:disabled {
                 background: #b8c3d2;
                 color: #eef2f8;
@@ -145,6 +168,7 @@ class WDSecurityWindow:
                 background: #fbfdff;
                 padding: 8px;
                 color: #1b2f4d;
+                line-height: 1.3;
             }
         ''')
 
@@ -241,6 +265,11 @@ class WDSecurityWindow:
         status_title = QLabel('Status & Activity')
         status_title.setObjectName('sectionTitle')
 
+        self.state_chip = QLabel('READY')
+        self.state_chip.setObjectName('stateChip')
+        self.state_chip.setAlignment(Qt.AlignCenter)
+        self.state_chip.setMinimumWidth(85)
+
         self.clear_log_btn = QPushButton('Clear')
         self.clear_log_btn.setObjectName('neutralBtn')
         self.clear_log_btn.clicked.connect(self.clear_logs)
@@ -249,6 +278,7 @@ class WDSecurityWindow:
 
         status_header.addWidget(status_title)
         status_header.addStretch(1)
+        status_header.addWidget(self.state_chip)
         status_header.addWidget(self.clear_log_btn)
         status_layout.addLayout(status_header)
 
@@ -280,9 +310,14 @@ class WDSecurityWindow:
     def apply_texts(self, frame):
         frame.setWindowTitle('WD Security for Linux')
         self.decrypt_btn.setEnabled(False)
+        self.set_state('READY')
+
+    def set_state(self, value):
+        self.state_chip.setText(value.upper())
 
     def append_log(self, msg):
-        self.message_box.append(msg)
+        stamp = datetime.now().strftime('%H:%M:%S')
+        self.message_box.append(f'[{stamp}] {msg}')
 
     @pyqtSlot(int)
     def toggle_password_visibility(self, state):
@@ -292,6 +327,7 @@ class WDSecurityWindow:
     @pyqtSlot()
     def clear_logs(self):
         self.message_box.clear()
+        self.set_state('READY')
 
     @pyqtSlot(str)
     def pw_box_text_changed(self, text):
@@ -309,6 +345,7 @@ class WDSecurityWindow:
         wd_usb_lines = [line for line in out.splitlines() if 'western digital' in line.lower()]
 
         if not wd_usb_lines:
+            self.set_state('WAITING')
             self.append_log('No Western Digital drive attached.')
             self.append_log('Please attach a compatible drive and restart.')
             self.pw_box.setEnabled(False)
@@ -319,11 +356,13 @@ class WDSecurityWindow:
 
         lsblk_out, _, _ = run_cmd(['lsblk'])
         if 'wd unlocker' not in lsblk_out.lower():
+            self.set_state('CHECK')
             self.append_log("Either the drive is not locked or doesn't support WD security.")
             self.append_log('If this is wrong, reconnect the disk and try again.')
             self.pw_box.setEnabled(False)
             return
 
+        self.set_state('READY')
         self.append_log('Checking drive lock status...')
         self.check_unlock_status()
 
@@ -336,6 +375,7 @@ class WDSecurityWindow:
         elif num_lines == 1:
             self.append_log('Drive appears to be locked.')
         else:
+            self.set_state('MOUNT')
             self.append_log('Drive appears to be already unlocked.')
             self.pw_box.setEnabled(False)
             self.append_log('Drive device name: ' + PARTNAME)
@@ -399,6 +439,7 @@ class WDSecurityWindow:
         return path
 
     def call_cooking_pw(self):
+        self.set_state('WORKING')
         self.append_log('Preparing password payload...')
         QApplication.processEvents()
 
@@ -406,12 +447,14 @@ class WDSecurityWindow:
         self.pw_box.clear()
 
         if not password:
+            self.set_state('READY')
             self.append_log('Password cannot be empty.')
             return
 
         try:
             payload_path = self.create_password_blob(password)
         except Exception as exc:
+            self.set_state('ERROR')
             self.append_log(f'Cannot prepare password payload: {exc}')
             return
 
@@ -436,10 +479,12 @@ class WDSecurityWindow:
         try:
             sg_devices = self.find_sg_devices()
             if not sg_devices:
+                self.set_state('ERROR')
                 self.append_log("Failure: couldn't find an sg 'type 13' device in dmesg.")
                 return
 
             if len(sg_devices) > 1:
+                self.set_state('ERROR')
                 self.append_log("Multiple SCSI 'type 13' devices recognized.")
                 self.append_log('Unplug other devices and retry.')
                 return
@@ -452,9 +497,11 @@ class WDSecurityWindow:
                 run_cmd(cmd, check=True)
                 self.append_log('The WD drive is now unlocked and can be mounted!')
             except subprocess.CalledProcessError:
+                self.set_state('ERROR')
                 self.append_log('SCSI decrypt command failed. Check password and connections.')
                 return
 
+            self.set_state('MOUNT')
             self.pw_box.setEnabled(False)
             self.decrypt_btn.setEnabled(False)
             self.mount_wd()
@@ -469,6 +516,7 @@ class WDSecurityWindow:
 
         self.get_partname()
         if not PARTNAME:
+            self.set_state('ERROR')
             self.append_log('Cannot determine drive device name. Please mount manually.')
             return
 
@@ -480,8 +528,10 @@ class WDSecurityWindow:
         _, _, mount_rc = run_cmd(['udisksctl', 'mount', '-b', devname])
 
         if mount_rc == 0:
+            self.set_state('DONE')
             self.append_log('WD hard drive decrypted and mounted successfully!')
         else:
+            self.set_state('WARN')
             self.append_log('Drive decrypted, but automount failed. Please mount manually.')
 
         self.append_log('If needed, mount partitions manually using "mount".')
